@@ -1,0 +1,118 @@
+---
+title: "Statistical Inference on the ToothGrow data in R"
+author: "Cleitus"
+date: "Saturday, January 17, 2015"
+output: html_document
+---
+
+We are going to analyze the ToothGrowth data in the R datasets package.  
+Loading required packages.  
+```{r, results='hide', message=FALSE}
+# Load necessary library
+library(ggplot2)
+library(datasets)
+```
+
+##1. Exploratory Data Analysis
+
+We're gonna store the ToothGrowth data in the dataframe `df`.  
+```{r}
+df <- data.frame(ToothGrowth)
+str(df)
+```
+
+60 total Observations with 3 columns :  
+
+* Tooth Length (len)
+* Supplementary (supp) : OJ(orange juice) or VC(vitamin C)
+* Dosage (dose) : 0.5, 1 or 2
+
+```{r}
+summary(df)
+```
+
+Things are starting to unfold, basically we now know that we need to compare tooth length for both supplements as well as the effect of the dose of each supplement.  
+
+We could start by splitting the data according to what supplement is being used.  
+```{r}
+df.len = data.frame(split(df, df$supp))
+head(df.len)
+```
+
+Plot of Supplement Type VS Tooth Length  
+```{r}
+ggplot(data=df, aes(x=supp, y=len)) + 
+  geom_boxplot(aes(fill=supp), outlier.colour = "green", outlier.size = 3) + 
+  labs(title="Supplementary Type vs Tooth Length", x="Supplementary", y="Tooth Length")
+```
+
+Plot of Dose VS Tooth Length
+```{r}
+p <- ggplot(data=df, aes(x=dose, y=len)) + 
+  geom_boxplot(aes(fill=factor(dose)), outlier.colour = "green", outlier.size = 3) + 
+  labs(title="Dose Quantity vs Tooth Length", x="Dose Quantity", y="Tooth Length")
+p + facet_grid(. ~ supp)
+```
+
+Preliminary conclusions :
+
+* OJ seems to have higher affect on tooth length than VC
+* It also seems that, for both supplements, the higher the dose the longer the tooth
+
+##2. Statistical Inference
+
+###2.1 Effect of Supplements  
+
+The null hypothesis (H0) is such as : Supplements of Orange Juice and Vitamin C do not have differential affects on the tooth length.  
+From our exploratory analysis we might be tempted to reject H0 in favor of OJ having higher effect than VC.  
+
+Let's settle this with a t-test. First find the variance of the 2 sets of supplements.
+```{r}
+sapply(split(df$len, df$supp), var)
+```
+
+Variances look pretty far apart therefore we wont assume equality of variances in the following t-test.
+```{r}
+t.test(df.len$VC.len, df.len$OJ.len, paired=FALSE, var.equal=FALSE)
+```
+
+Notice how the 95% confidence interval contains ZERO, thus we can't reject H0 - that means we can not say conclusively that the supplements have any differential impact on the Tooth Length (OJ and VC are the same 'tooth length' wise).
+
+On the other hand, intuitively, we could be asking the alternative question : Is OJ more influential than VC?  
+Therefore, we might think of conducting a one-sided test. In this case :  
+```{r}
+t.test(df.len$OJ.len, df.len$VC.len, paired=FALSE, var.equal=FALSE, alternative = "greater")
+```
+
+Here we see that the interval doesn't contain ZERO and is positive, so we could infer that the effect of OJ is larger than that of VC on tooth length.  
+
+###2.2 Effect of the Dose  
+
+Now to see the effect of the dose amount on tooth length.
+The null hypothesis (H0) is such as : Different doses do not have differential affects on the tooth length.
+Here we have three levels to study :
+
+* [0.5 ; 1.0]
+* [1.0 ; 2.0]
+* [0.5 ; 2.0] _this one would turn out to be redundant if we reject H0 in either one of the first two_
+
+First level :
+```{r}
+t.test(df$len[df$dose==1], df$len[df$dose==0.5], paired = FALSE, var.equal = TRUE)
+```
+
+Since in a sense we tested \(1mg - 0.5mg\), then an all positive confidence interval suggests that \(1mg\) dose has greater impact of tooth growth than a \(0.5mg\) dose. Regect H0.  
+
+Second level :
+```{r}
+t.test(df$len[df$dose==2], df$len[df$dose==1], paired = FALSE, var.equal = TRUE)
+```
+
+Here too we regect H0. We can then infer that a (2mg\) dose has greater impact of tooth growth than a \(1mg\) dose.
+
+This obviously entails that we regect H0 for the third level as well.
+
+###2.3 Conclusion  
+
+* We could not prove with certainty that there is a difference between the supplements on tooth length
+* There is a clear increasing effect on the tooth length following an increase in the dose of a supplement
